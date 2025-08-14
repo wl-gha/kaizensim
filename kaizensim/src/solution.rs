@@ -13,8 +13,7 @@ pub struct Solution {
 }
 
 impl Solution {
-    pub fn try_from(bytes: &Vec<u8>) -> Result<Self, KaizenError> {
-        let mut data = &bytes[..];
+    pub fn try_from(mut data: &[u8]) -> Result<Self, KaizenError> {
         let _version = data.read_enum::<Version>()?;
         let level = data.read_i32()?;
         let name = data.read_string()?;
@@ -24,7 +23,7 @@ impl Solution {
         let area = data.read_i32()?;
         let parts = data.read_parts()?;
         let instructions = data.read_instructions()?;
-        if data.len() == 0 {
+        if data.is_empty() {
             Ok(Solution { level, name, solved, time, cost, area, parts, instructions })
         }
         else {

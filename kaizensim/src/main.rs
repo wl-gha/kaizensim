@@ -1,45 +1,69 @@
-use std::io::Read;
+use std::io::{Error, Read, Write};
+use std::path::PathBuf;
+use clap::{Args, Parser, Subcommand};
 use kaizensim::KaizenError;
 
-fn main() -> Result<(), KaizenError> {
-    let mut args = std::env::args();
-    let _ = args.next();
-    let command = match args.next() {
-        Some(command) => Command::try_from(command)?,
-        None => Command::Score,
-    };
-    let path = args.next();
-    Ok(match command {
-        Command::Score => println!("{:?}", kaizensim::score(&read(&path)?)?),
-    })
+fn main() -> Result<(), Error> {
+    let cli = Cli::parse();
+    match cli.command {
+        Command::Score(files) => {
+            if files.path.is_empty() {
+                writeln(kaizensim::score(&read_stdin()?).map(|s| s.to_string()))?
+            } else {
+                for path in files.path {
+                    writeln(kaizensim::score(&read_file(&path)?).map(|s| s.to_string()))?
+                }
+            }
+        },
+    }
+    Ok(())
 }
 
-fn read(path: &Option<String>) -> Result<Vec<u8>, KaizenError> {
+fn writeln(result: Result<String, KaizenError>)-> Result<(), Error> {
+    match result {
+        Ok(v) => std::io::stdout().write_all(format!("{v}\n").as_bytes()),
+        Err(e) => std::io::stderr().write_all(format!("{e:?}\n").as_bytes()),
+    }
+}
+
+fn read(path: &Option<PathBuf>) -> Result<Vec<u8>, Error> {
     match path {
         Some(path) => read_file(path),
         None => read_stdin(),
     }
 }
 
-fn read_file(path: &String) -> Result<Vec<u8>, KaizenError> {
-    std::fs::read(path).or(Err(KaizenError::CouldNotReadFile))
+fn read_file(path: &PathBuf) -> Result<Vec<u8>, Error> {
+    std::fs::read(path)
 }
 
-fn read_stdin() -> Result<Vec<u8>, KaizenError> {
+fn read_stdin() -> Result<Vec<u8>, Error> {
     let mut buf = vec![];
-    std::io::stdin().read_to_end(&mut buf).or(Err(KaizenError::CouldNotReadStdIn))?;
+    std::io::stdin().read_to_end(&mut buf)?;
     Ok(buf)
 }
 
-enum Command {
-    Score,
+#[derive(Parser)]
+#[command(version, about = "Tool for Kaizen: A Factory Story solutions")]
+struct Cli {
+    #[command(subcommand)]
+    command: Command,
 }
 
-impl Command {
-    fn try_from(value: String) -> Result<Self, KaizenError> {
-        match &value[..] {
-            "score" => Ok(Command::Score),
-            _ => Err(KaizenError::UnknownCommand(value)),
-        }
-    }
+#[derive(Subcommand)]
+enum Command {
+    #[command(about = "Return the score of a solution")]
+    Score(SolutionFiles),
+}
+
+#[derive(Args)]
+struct SolutionFiles {
+    #[arg(help = "Path(s) to solution(s), uses STDIN if omitted")]
+    path: Vec<PathBuf>,
+}
+
+#[derive(Args)]
+struct SolutionFile {
+    #[arg(help = "Path to solution")]
+    path: PathBuf,
 }
