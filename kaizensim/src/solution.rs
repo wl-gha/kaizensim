@@ -1,6 +1,8 @@
 use crate::*;
 use crate::point::*;
 
+const MAX_COORD: i32 = 4096;
+
 pub struct Solution {
     pub level: i32,
     pub name: String,
@@ -44,19 +46,22 @@ trait SolutionReader: std::io::Read {
         Ok(self.read_bytes::<1>()?[0] == 1)
     }
     fn read_i32(&mut self) -> Result<i32, KaizenError> {
-        let i = i32::from_le_bytes(self.read_bytes()?);
-        if (-4096..4096).contains(&i) {
-            Ok(i)
-        } else {
-            Err(KaizenError::NumberOutsideAllowedRange(i))
-        }
+        Ok(i32::from_le_bytes(self.read_bytes()?))
     }
     fn read_usize(&mut self) -> Result<usize, KaizenError> {
         usize::try_from(self.read_i32()?).or(Err(KaizenError::CorruptedFile))
     }
+    fn read_coord(&mut self) -> Result<i32, KaizenError> {
+        let i = self.read_i32()?;
+        if (-MAX_COORD..MAX_COORD).contains(&i) {
+            Ok(i)
+        } else {
+            Err(KaizenError::CoordOutsideAllowedRange(i))
+        }
+    }
     fn read_point(&mut self) -> Result<Point, KaizenError> {
-        let x = self.read_i32()?;
-        let y = self.read_i32()?;
+        let x = self.read_coord()?;
+        let y = self.read_coord()?;
         Ok(Point { x, y })
     }
     fn read_enum<T: ParseEnum<i32>>(&mut self) -> Result<T, KaizenError> {

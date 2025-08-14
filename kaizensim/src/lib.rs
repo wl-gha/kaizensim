@@ -21,6 +21,7 @@ pub struct Score {
     pub cost: i32,
     pub area: i32,
 }
+
 impl std::fmt::Display for Score {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         write!(f, "{{\"level\": {}, \"time\": {}, \"cost\": {}, \"area\": {}}}", self.level, self.time, self.cost, self.area)
@@ -30,7 +31,7 @@ impl std::fmt::Display for Score {
 #[derive(Debug)]
 pub enum KaizenError {
     CorruptedFile,
-    NumberOutsideAllowedRange(i32),
+    CoordOutsideAllowedRange(i32),
     SolutionIncomplete,
     UnknownInstruction(i32),
     UnknownPart(i32),
