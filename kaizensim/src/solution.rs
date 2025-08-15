@@ -79,7 +79,7 @@ pub fn is_manipulated(solution: &Solution) -> bool {
             },
         }
     }
-    return false;
+    false
 }
 
 pub struct Solution {

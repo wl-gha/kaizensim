@@ -8,10 +8,10 @@ fn main() -> Result<(), Error> {
     match cli.command {
         Command::Score(files) => {
             if files.path.is_empty() {
-                println(kaizensim::score(&read_stdin()?).map(|s| s.to_string()))
+                println_json(kaizensim::score(&read_stdin()?))
             } else {
                 for path in files.path {
-                    println(kaizensim::score(&read_file(&path)?).map(|s| s.to_string()))
+                    println_json(kaizensim::score(&read_file(&path)?))
                 }
             }
         },
@@ -19,10 +19,23 @@ fn main() -> Result<(), Error> {
     Ok(())
 }
 
-fn println(result: Result<String, KaizenError>) {
+fn println_json<T>(result: Result<T, KaizenError>)
+where
+    T: serde::Serialize,
+{
     match result {
-        Ok(v) => println!("{v}"),
-        Err(e) => println!("{e}"),
+        Ok(v) => println!("{}", serde_json::to_string(&v).unwrap()),
+        Err(e) => println!("{}", serde_json::to_string(&e).unwrap()),
+    }
+}
+
+fn println<T>(result: Result<T, KaizenError>)
+where
+    T: std::fmt::Debug,
+{
+    match result {
+        Ok(v) => println!("{v:?}"),
+        Err(e) => println!("{e:?}"),
     }
 }
 

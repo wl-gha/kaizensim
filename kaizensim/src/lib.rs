@@ -1,3 +1,4 @@
+use serde::{Serialize, Serializer};
 use crate::solution::*;
 
 mod point;
@@ -19,18 +20,13 @@ pub fn score(bytes: &[u8]) -> Result<Score, KaizenError> {
     }
 }
 
+#[derive(Serialize)]
 pub struct Score {
     pub level: i32,
     pub time: i32,
     pub cost: i32,
     pub area: i32,
     pub manipulated: bool,
-}
-
-impl std::fmt::Display for Score {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        write!(f, "{{\"level\": {}, \"time\": {}, \"cost\": {}, \"area\": {}, \"manipulated\": {}}}", self.level, self.time, self.cost, self.area, self.manipulated)
-    }
 }
 
 #[derive(Debug)]
@@ -42,9 +38,15 @@ pub enum KaizenError {
     UnknownVersion(i32),
 }
 
-impl std::fmt::Display for KaizenError {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        write!(f, "{{\"error\": \"{self:?}\"}}")
+impl Serialize for KaizenError {
+    fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
+    where
+        S: Serializer
+    {
+        use serde::ser::SerializeStruct;
+        let mut state = serializer.serialize_struct("Error", 1)?;
+        state.serialize_field("error", &format!("{self:?}"))?;
+        state.end()
     }
 }
 
