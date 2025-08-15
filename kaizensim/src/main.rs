@@ -1,4 +1,4 @@
-use std::io::{Error, Read, Write};
+use std::io::{Error, Read};
 use std::path::PathBuf;
 use clap::{Args, Parser, Subcommand};
 use kaizensim::KaizenError;
@@ -8,10 +8,10 @@ fn main() -> Result<(), Error> {
     match cli.command {
         Command::Score(files) => {
             if files.path.is_empty() {
-                writeln(kaizensim::score(&read_stdin()?).map(|s| s.to_string()))?
+                println(kaizensim::score(&read_stdin()?).map(|s| s.to_string()))
             } else {
                 for path in files.path {
-                    writeln(kaizensim::score(&read_file(&path)?).map(|s| s.to_string()))?
+                    println(kaizensim::score(&read_file(&path)?).map(|s| s.to_string()))
                 }
             }
         },
@@ -19,10 +19,10 @@ fn main() -> Result<(), Error> {
     Ok(())
 }
 
-fn writeln(result: Result<String, KaizenError>)-> Result<(), Error> {
+fn println(result: Result<String, KaizenError>) {
     match result {
-        Ok(v) => std::io::stdout().write_all(format!("{v}\n").as_bytes()),
-        Err(e) => std::io::stderr().write_all(format!("{e:?}\n").as_bytes()),
+        Ok(v) => println!("{v}"),
+        Err(e) => println!("{e}"),
     }
 }
 

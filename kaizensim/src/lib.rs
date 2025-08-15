@@ -38,6 +38,12 @@ pub enum KaizenError {
     UnknownVersion(i32),
 }
 
+impl std::fmt::Display for KaizenError {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "{{\"error\": \"{self:?}\"}}")
+    }
+}
+
 pub trait ParseEnum<T> : Sized {
     fn try_from(value: T) -> Result<Self, KaizenError>;
 }
