@@ -1,14 +1,18 @@
+use crate::solution::*;
+
 mod point;
 mod solution;
 
 pub fn score(bytes: &[u8]) -> Result<Score, KaizenError> {
-    let solution = solution::Solution::try_from(bytes)?;
+    let solution = Solution::try_from(bytes)?;
+    let manipulated = is_manipulated(&solution);
     if solution.solved {
         Ok(Score {
             level: solution.level,
             time: solution.time,
             cost: solution.cost,
             area: solution.area,
+            manipulated,
         })
     } else {
         Err(KaizenError::SolutionIncomplete)
@@ -20,18 +24,18 @@ pub struct Score {
     pub time: i32,
     pub cost: i32,
     pub area: i32,
+    pub manipulated: bool,
 }
 
 impl std::fmt::Display for Score {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        write!(f, "{{\"level\": {}, \"time\": {}, \"cost\": {}, \"area\": {}}}", self.level, self.time, self.cost, self.area)
+        write!(f, "{{\"level\": {}, \"time\": {}, \"cost\": {}, \"area\": {}, \"manipulated\": {}}}", self.level, self.time, self.cost, self.area, self.manipulated)
     }
 }
 
 #[derive(Debug)]
 pub enum KaizenError {
     CorruptedFile,
-    CoordOutsideAllowedRange(i32),
     SolutionIncomplete,
     UnknownInstruction(i32),
     UnknownPart(i32),

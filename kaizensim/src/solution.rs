@@ -1,7 +1,86 @@
+use std::collections::HashSet;
+
 use crate::*;
 use crate::point::*;
 
 const MAX_COORD: i32 = 4096;
+const MAX_INSTRUCTIONS_PER_CYCLE: i32 = 4;
+const MAX_EXTEND: i32 = 3;
+const MAX_SLIDE: i32 = 9;
+const MIN_TRACK_LEN: i32 = 1;
+const MAX_TRACK_LEN: i32 = 9;
+const MIN_ARM_LEN: i32 = 1;
+const MAX_ARM_LEN: i32 = 4;
+const MIN_ARM_LABEL: i32 = 0;
+const MAX_ARM_LABEL: i32 = 25;
+
+pub fn is_manipulated(solution: &Solution) -> bool {
+    let mut arms = HashSet::new();
+    let mut inputs = HashSet::new();
+    for part in &solution.parts {
+        if !(-MAX_COORD..=MAX_COORD).contains(&part.pos.x) { return true; }
+        if !(-MAX_COORD..=MAX_COORD).contains(&part.pos.y) { return true; }
+        if !part.size.is_line() { return true; }
+        match part.kind {
+            PartKind::Arm => {
+                if !(MIN_ARM_LABEL..=MAX_ARM_LABEL).contains(&part.arm) { return true; }
+                if !(MIN_ARM_LEN..=MAX_ARM_LEN).contains(&part.size.sum().abs()) { return true; }
+                if !arms.insert(part.arm) { return true; }
+                if part.input != -1 { return true; }
+            },
+            PartKind::Cutter => {
+                if part.arm != -1 { return true; }
+                if !part.size.is_empty() { return true; }
+                if part.input != -1 { return true; }
+            },
+            PartKind::Drill => {
+                if !(MIN_ARM_LABEL..=MAX_ARM_LABEL).contains(&part.arm) { return true; }
+                if !(MIN_ARM_LEN..=MAX_ARM_LEN).contains(&part.size.sum().abs()) { return true; }
+                if !arms.insert(part.arm) { return true; }
+                if part.input != -1 { return true; }
+            },
+            PartKind::Input => {
+                if part.arm != -1 { return true; }
+                if !inputs.insert(part.input) { return true; }
+            },
+            PartKind::Riveter => {
+                if part.arm != -1 { return true; }
+                if part.size.sum().abs() != 1 { return true; }
+                if part.input != -1 { return true; }
+            },
+            PartKind::Track => {
+                if part.arm != -1 { return true; }
+                if !(MIN_TRACK_LEN..=MAX_TRACK_LEN).contains(&part.size.sum().abs()) { return true; }
+                if part.input != -1 { return true; }
+            },
+            PartKind::Welder => {
+                if part.arm != -1 { return true; }
+                if part.size.sum().abs() != 1 { return true; }
+                if part.input != -1 { return true; }
+            },
+        }
+    }
+    let mut instructions = HashSet::new();
+    for instruction in &solution.instructions {
+        if instruction.column < 0 { return true; }
+        if !(0..MAX_INSTRUCTIONS_PER_CYCLE).contains(&instruction.row) { return true; }
+        if !instructions.insert(Point { x: instruction.column, y: instruction.row }) { return true; }
+        if !arms.contains(&instruction.arm) { return true; }
+        match instruction.kind {
+            InstructionKind::Extend => {
+                if !(1..=MAX_EXTEND).contains(&instruction.distance.abs()) { return true; }
+            },
+            InstructionKind::Flip => {
+            },
+            InstructionKind::Poke => {
+            },
+            InstructionKind::Slide => {
+                if !(1..=MAX_SLIDE).contains(&instruction.distance.abs()) { return true; }
+            },
+        }
+    }
+    return false;
+}
 
 pub struct Solution {
     pub level: i32,
@@ -51,17 +130,9 @@ trait SolutionReader: std::io::Read {
     fn read_usize(&mut self) -> Result<usize, KaizenError> {
         usize::try_from(self.read_i32()?).or(Err(KaizenError::CorruptedFile))
     }
-    fn read_coord(&mut self) -> Result<i32, KaizenError> {
-        let i = self.read_i32()?;
-        if (-MAX_COORD..MAX_COORD).contains(&i) {
-            Ok(i)
-        } else {
-            Err(KaizenError::CoordOutsideAllowedRange(i))
-        }
-    }
     fn read_point(&mut self) -> Result<Point, KaizenError> {
-        let x = self.read_coord()?;
-        let y = self.read_coord()?;
+        let x = self.read_i32()?;
+        let y = self.read_i32()?;
         Ok(Point { x, y })
     }
     fn read_enum<T: ParseEnum<i32>>(&mut self) -> Result<T, KaizenError> {
