@@ -1,4 +1,5 @@
 use std::collections::HashSet;
+use std::io::Read;
 
 use crate::*;
 use crate::point::*;
@@ -94,29 +95,41 @@ pub struct Solution {
 }
 
 impl Solution {
-    pub fn try_from(mut data: &[u8]) -> Result<Self, KaizenError> {
-        let _version = data.read_enum::<Version>()?;
-        let level = data.read_i32()?;
-        let name = data.read_string()?;
-        let solved = data.read_bool()?;
-        let time = data.read_i32()?;
-        let cost = data.read_i32()?;
-        let area = data.read_i32()?;
-        let parts = data.read_parts()?;
-        let instructions = data.read_instructions()?;
-        if data.is_empty() {
+    pub fn try_from(data: &[u8]) -> Result<Self, KaizenError> {
+        SolutionReader::from(data).read_solution()
+    }
+}
+
+struct SolutionReader<'a> {
+    data: &'a [u8],
+    version: Version,
+}
+
+impl<'a> SolutionReader<'a> {
+    pub fn from(data: &'a [u8]) -> Self {
+        let version = Version::Unknown;
+        SolutionReader { data, version }
+    }
+    pub fn read_solution(&mut self) -> Result<Solution, KaizenError> {
+        self.version = self.read_enum::<Version>()?;
+        let level = self.read_i32()?;
+        let name = self.read_string()?;
+        let solved = self.read_bool()?;
+        let time = self.read_i32()?;
+        let cost = self.read_i32()?;
+        let area = self.read_i32()?;
+        let parts = self.read_parts()?;
+        let instructions = self.read_instructions()?;
+        if self.data.is_empty() {
             Ok(Solution { level, name, solved, time, cost, area, parts, instructions })
         }
         else {
             Err(KaizenError::CorruptedFile)
         }
     }
-}
-
-trait SolutionReader: std::io::Read {
     fn read_bytes<const N: usize>(&mut self) -> Result<[u8; N], KaizenError> {
         let mut buf = [0u8; N];
-        match self.read_exact(&mut buf) {
+        match self.data.read_exact(&mut buf) {
             Ok(()) => Ok(buf),
             Err(_) => Err(KaizenError::CorruptedFile),
         }
@@ -144,7 +157,7 @@ trait SolutionReader: std::io::Read {
     }
     fn read_fixed_size_string(&mut self, len: usize) -> Result<String, KaizenError> {
         let mut buf = vec![0u8; len];
-        match self.read_exact(&mut buf) {
+        match self.data.read_exact(&mut buf) {
             Ok(()) => String::from_utf8(buf).or(Err(KaizenError::CorruptedFile)),
             Err(_) => Err(KaizenError::CorruptedFile),
         }
@@ -172,10 +185,12 @@ trait SolutionReader: std::io::Read {
         let arm = self.read_i32()?;
         let distance = self.read_i32()?;
         let grab = self.read_bool()?;
+        if matches!(self.version, Version::V2) {
+            self.read_i32()?;
+        }
         Ok(Instruction { column, row, kind, arm, distance, grab })
     }
 }
-impl SolutionReader for &[u8] {}
 
 pub struct Part {
     pub kind: PartKind,
@@ -194,14 +209,17 @@ pub struct Instruction {
     pub grab: bool,
 }
 
-pub enum Version {
+enum Version {
+    Unknown,
     V1,
+    V2,
 }
 
 impl ParseEnum<i32> for Version {
     fn try_from(value: i32) -> Result<Self, KaizenError> {
         match value {
             10 => Ok(Version::V1),
+            11 => Ok(Version::V2),
             other => Err(KaizenError::UnknownVersion(other)),
         }
     }
