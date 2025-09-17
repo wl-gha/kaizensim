@@ -15,6 +15,10 @@ const MAX_ARM_LEN: i32 = 4;
 const MIN_ARM_LABEL: i32 = 0;
 const MAX_ARM_LABEL: i32 = 25;
 
+pub fn read_solution(data: &[u8]) -> Result<Solution, KaizenError> {
+    SolutionReader::create(data).read_solution()
+}
+
 pub fn is_manipulated(solution: &Solution) -> bool {
     let mut arms = HashSet::new();
     let mut inputs = HashSet::new();
@@ -71,12 +75,12 @@ pub fn is_manipulated(solution: &Solution) -> bool {
             InstructionKind::Extend => {
                 if !(1..=MAX_EXTEND).contains(&instruction.distance.abs()) { return true; }
             },
+            InstructionKind::Slide => {
+                if !(1..=MAX_SLIDE).contains(&instruction.distance.abs()) { return true; }
+            },
             InstructionKind::Flip => {
             },
             InstructionKind::Poke => {
-            },
-            InstructionKind::Slide => {
-                if !(1..=MAX_SLIDE).contains(&instruction.distance.abs()) { return true; }
             },
         }
     }
@@ -94,23 +98,17 @@ pub struct Solution {
     pub instructions: Vec<Instruction>,
 }
 
-impl Solution {
-    pub fn try_from(data: &[u8]) -> Result<Self, KaizenError> {
-        SolutionReader::from(data).read_solution()
-    }
-}
-
 struct SolutionReader<'a> {
     data: &'a [u8],
     version: Version,
 }
 
 impl<'a> SolutionReader<'a> {
-    pub fn from(data: &'a [u8]) -> Self {
+    fn create(data: &'a [u8]) -> Self {
         let version = Version::Unknown;
-        SolutionReader { data, version }
+        Self { data, version }
     }
-    pub fn read_solution(&mut self) -> Result<Solution, KaizenError> {
+    fn read_solution(&mut self) -> Result<Solution, KaizenError> {
         self.version = self.read_enum::<Version>()?;
         let level = self.read_i32()?;
         let name = self.read_string()?;
@@ -124,14 +122,14 @@ impl<'a> SolutionReader<'a> {
             Ok(Solution { level, name, solved, time, cost, area, parts, instructions })
         }
         else {
-            Err(KaizenError::CorruptedFile)
+            Err(KaizenError::SolutionCouldNotBeRead)
         }
     }
     fn read_bytes<const N: usize>(&mut self) -> Result<[u8; N], KaizenError> {
         let mut buf = [0u8; N];
         match self.data.read_exact(&mut buf) {
             Ok(()) => Ok(buf),
-            Err(_) => Err(KaizenError::CorruptedFile),
+            Err(_) => Err(KaizenError::SolutionCouldNotBeRead),
         }
     }
     fn read_bool(&mut self) -> Result<bool, KaizenError> {
@@ -141,7 +139,7 @@ impl<'a> SolutionReader<'a> {
         Ok(i32::from_le_bytes(self.read_bytes()?))
     }
     fn read_usize(&mut self) -> Result<usize, KaizenError> {
-        usize::try_from(self.read_i32()?).or(Err(KaizenError::CorruptedFile))
+        usize::try_from(self.read_i32()?).or(Err(KaizenError::SolutionCouldNotBeRead))
     }
     fn read_point(&mut self) -> Result<Point, KaizenError> {
         let x = self.read_i32()?;
@@ -158,8 +156,8 @@ impl<'a> SolutionReader<'a> {
     fn read_fixed_size_string(&mut self, len: usize) -> Result<String, KaizenError> {
         let mut buf = vec![0u8; len];
         match self.data.read_exact(&mut buf) {
-            Ok(()) => String::from_utf8(buf).or(Err(KaizenError::CorruptedFile)),
-            Err(_) => Err(KaizenError::CorruptedFile),
+            Ok(()) => String::from_utf8(buf).or(Err(KaizenError::SolutionCouldNotBeRead)),
+            Err(_) => Err(KaizenError::SolutionCouldNotBeRead),
         }
     }
     fn read_parts(&mut self) -> Result<Vec<Part>, KaizenError> {
@@ -167,7 +165,7 @@ impl<'a> SolutionReader<'a> {
         (0..len).map(|_| self.read_part()).collect()
     }
     fn read_part(&mut self) -> Result<Part, KaizenError> {
-        let kind = self.read_enum::<PartKind>()?;
+        let kind = self.read_enum()?;
         let arm = self.read_i32()?;
         let pos = self.read_point()?;
         let size = self.read_point()?;
@@ -181,14 +179,15 @@ impl<'a> SolutionReader<'a> {
     fn read_instruction(&mut self) -> Result<Instruction, KaizenError> {
         let column = self.read_i32()?;
         let row = self.read_i32()?;
-        let kind = self.read_enum::<InstructionKind>()?;
+        let kind = self.read_enum()?;
         let arm = self.read_i32()?;
         let distance = self.read_i32()?;
         let grab = self.read_bool()?;
-        if matches!(self.version, Version::V2) {
-            self.read_i32()?;
-        }
-        Ok(Instruction { column, row, kind, arm, distance, grab })
+        let variant = match self.version {
+            Version::V1 => Variant::Both,
+            _ => self.read_enum()?,
+        };
+        Ok(Instruction { column, row, kind, arm, distance, grab, variant })
     }
 }
 
@@ -207,6 +206,7 @@ pub struct Instruction {
     pub arm: i32,
     pub distance: i32,
     pub grab: bool,
+    pub variant: Variant,
 }
 
 enum Version {
@@ -218,8 +218,8 @@ enum Version {
 impl ParseEnum<i32> for Version {
     fn try_from(value: i32) -> Result<Self, KaizenError> {
         match value {
-            10 => Ok(Version::V1),
-            11 => Ok(Version::V2),
+            10 => Ok(Self::V1),
+            11 => Ok(Self::V2),
             other => Err(KaizenError::UnknownVersion(other)),
         }
     }
@@ -227,24 +227,24 @@ impl ParseEnum<i32> for Version {
 
 pub enum PartKind {
     Arm,
-    Cutter,
-    Drill,
-    Input,
-    Riveter,
     Track,
     Welder,
+    Riveter,
+    Cutter,
+    Input,
+    Drill,
 }
 
 impl ParseEnum<i32> for PartKind {
     fn try_from(value: i32) -> Result<Self, KaizenError> {
         match value {
-            1 => Ok(PartKind::Arm),
-            2 => Ok(PartKind::Track),
-            3 => Ok(PartKind::Welder),
-            4 => Ok(PartKind::Riveter),
-            5 => Ok(PartKind::Cutter),
-            6 => Ok(PartKind::Input),
-            8 => Ok(PartKind::Drill),
+            1 => Ok(Self::Arm),
+            2 => Ok(Self::Track),
+            3 => Ok(Self::Welder),
+            4 => Ok(Self::Riveter),
+            5 => Ok(Self::Cutter),
+            6 => Ok(Self::Input),
+            8 => Ok(Self::Drill),
             other => Err(KaizenError::UnknownPart(other)),
         }
     }
@@ -252,19 +252,36 @@ impl ParseEnum<i32> for PartKind {
 
 pub enum InstructionKind {
     Extend,
+    Slide,
     Flip,
     Poke,
-    Slide,
 }
 
 impl ParseEnum<i32> for InstructionKind {
     fn try_from(value: i32) -> Result<Self, KaizenError> {
         match value {
-            1 => Ok(InstructionKind::Extend),
-            2 => Ok(InstructionKind::Slide),
-            3 => Ok(InstructionKind::Flip),
-            4 => Ok(InstructionKind::Poke),
+            1 => Ok(Self::Extend),
+            2 => Ok(Self::Slide),
+            3 => Ok(Self::Flip),
+            4 => Ok(Self::Poke),
             other => Err(KaizenError::UnknownInstruction(other)),
+        }
+    }
+}
+
+pub enum Variant {
+    A,
+    B,
+    Both,
+}
+
+impl ParseEnum<i32> for Variant {
+    fn try_from(value: i32) -> Result<Self, KaizenError> {
+        match value {
+            1 => Ok(Self::A),
+            2 => Ok(Self::B),
+            3 => Ok(Self::Both),
+            other => Err(KaizenError::UnknownVariant(other)),
         }
     }
 }

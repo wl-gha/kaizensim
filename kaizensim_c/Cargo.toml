@@ -1,0 +1,11 @@
+[package]
+name = "kaizensim_c"
+version = "0.3.0"
+edition = "2024"
+
+[lib]
+name = "kaizensim"
+crate-type = ["cdylib"]
+
+[dependencies]
+kaizensim = { path = "../kaizensim/" }

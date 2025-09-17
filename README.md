@@ -1,8 +1,8 @@
 # kaizensim
 
-Tool for [Kaizen: A Factory Story](https://store.steampowered.com/app/2275490/Kaizen_A_Factory_Story/) solutions
+Tool for [Kaizen: A Factory Story](https://coincidence.games/kaizen/) solutions
 
-## Output
+## CLI
 
 ### score
 
@@ -28,6 +28,28 @@ On error:
 ```yaml
 {
     // Human-readable error message
-    "error": "SolutionIncomplete"
+    "error": "Solution incomplete"
+}
+```
+
+## FFI
+
+### score
+
+```rust
+score_create(data: *const u8, len: usize) -> *const ScoreResult
+
+score_destroy(score: *const ScoreResult)
+
+struct ScoreResult
+{
+    // Pointer to NUL-terminated error string, null pointer if no error
+    error: usize,
+    error_len: usize,
+    level: i32,
+    time: i32,
+    cost: i32,
+    area: i32,
+    manipulated: bool,
 }
 ```

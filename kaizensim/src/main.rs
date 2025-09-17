@@ -29,23 +29,6 @@ where
     }
 }
 
-fn println<T>(result: Result<T, KaizenError>)
-where
-    T: std::fmt::Debug,
-{
-    match result {
-        Ok(v) => println!("{v:?}"),
-        Err(e) => println!("{e:?}"),
-    }
-}
-
-fn read(path: &Option<PathBuf>) -> Result<Vec<u8>, Error> {
-    match path {
-        Some(path) => read_file(path),
-        None => read_stdin(),
-    }
-}
-
 fn read_file(path: &PathBuf) -> Result<Vec<u8>, Error> {
     std::fs::read(path)
 }
